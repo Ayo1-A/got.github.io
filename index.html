@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nexus Cloud Pro — Secure IDE & Publishing</title>
+
+    <!-- Core External Libraries -->
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js">
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#7c3aed',
+                        primaryLight: '#a78bfa',
+                        primaryDark: '#4f46e5',
+                        secondary: '#06b6d4',
+                        accent: '#f59e0b',
+                        darkBg: '#0b1120',
+                        darkPanel: '#151f38',
+                        darkCard: '#1a2744',
+                        lightBg: '#f1f5f9',
+                        lightPanel: '#ffffff',
+                        lightCard: '#f8fafc',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                    },
+                    boxShadow: {
+                        glass: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                        glassDark: '0 8px 32px rgba(0, 0, 0, 0.45)',
+                        premium: '0 20px 60px rgba(124, 58, 237, 0.15)',
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                        sm: '4px',
+                        md: '8px',
+                        lg: '12px',
+                    },
+                },
+            },
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-up {
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .scale-in {
+            animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Terminal */
+        .terminal {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            background: #0b1120;
+            color: #a5d6ff;
+            line-height: 1.7;
+            font-size: 0.875rem;
+        }
+
+        /* Ace Editor */
+        #ace-editor {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass {
+            background: rgba(21, 31, 56, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .glass-strong {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .dark .glass-strong {
+            background: rgba(21, 31, 56, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Fullscreen Utility */
+        .fullscreen-active {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Premium gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 40%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .gradient-border {
+            position: relative;
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1.5px;
+            background: linear-gradient(135deg, #7c3aed, #06b6d4);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        /* Smooth transitions for all interactive elements */
+        button,
+        a,
+        input,
+        textarea,
+        select,
+        .transition-all {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Button premium styles */
+        .btn-premium {
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: white;
+            font-weight: 600;
+            border: none;
+            padding: 0.625rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+        }
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(124, 58, 237, 0.4);
+        }
+        .btn-premium:active {
+            transform: translateY(0px);
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-premium-secondary {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+            font-weight: 600;
+            border: none;
+            padding: 0.625rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 16px rgba(6, 182, 212, 0.3);
+        }
+        .btn-premium-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(6, 182, 212, 0.4);
+        }
+
+        .btn-premium-ghost {
+            background: rgba(124, 58, 237, 0.1);
+            color: #7c3aed;
+            font-weight: 600;
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            padding: 0.625rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-premium-ghost:hover {
+            background: rgba(124, 58, 237, 0.18);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.15);
+        }
+        .dark .btn-premium-ghost {
+            background: rgba(124, 58, 237, 0.15);
+            border-color: rgba(124, 58, 237, 0.25);
+            color: #a78bfa;
+        }
+        .dark .btn-premium-ghost:hover {
+            background: rgba(124, 58, 237, 0.25);
+        }
+
+        /* Input premium */
+        .input-premium {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1.5px solid rgba(0, 0, 0, 0.08);
+            border-radius: 0.75rem;
+            outline: none;
+            font-size: 0.95rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Inter', sans-serif;
+        }
+        .input-premium:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+            background: white;
+        }
+        .dark .input-premium {
+            background: rgba(21, 31, 56, 0.8);
+            border-color: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+        }
+        .dark .input-premium:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.15);
+            background: rgba(21, 31, 56, 0.95);
+        }
+
+        /* Card premium */
+        .card-premium {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 1rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card-premium:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
+        }
+        .dark .card-premium {
+            background: rgba(21, 31, 56, 0.7);
+            border-color: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+        .dark .card-premium:hover {
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Table premium */
+        .table-premium th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .dark .table-premium th {
+            color: #94a3b8;
+            border-bottom-color: rgba(255, 255, 255, 0.06);
+        }
+        .table-premium td {
+            padding: 0.875rem 1.25rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+        .dark .table-premium td {
+            border-bottom-color: rgba(255, 255, 255, 0.04);
+        }
+        .table-premium tr {
+            transition: background 0.15s ease;
+        }
+        .table-premium tr:hover {
+            background: rgba(124, 58, 237, 0.04);
+        }
+        .dark .table-premium tr:hover {
+            background: rgba(124, 58, 237, 0.08);
+        }
+
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .badge-primary {
+            background: rgba(124, 58, 237, 0.12);
+            color: #7c3aed;
+        }
+        .dark .badge-primary {
+            background: rgba(124, 58, 237, 0.2);
+            color: #a78bfa;
+        }
+        .badge-secondary {
+            background: rgba(6, 182, 212, 0.12);
+            color: #06b6d4;
+        }
+        .dark .badge-secondary {
+            background: rgba(6, 182, 212, 0.2);
+            color: #22d3ee;
+        }
+        .badge-amber {
+            background: rgba(245, 158, 11, 0.12);
+            color: #d97706;
+        }
+        .dark .badge-amber {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+        .badge-red {
+            background: rgba(239, 68, 68, 0.12);
+            color: #dc2626;
+        }
+        .dark .badge-red {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        .badge-green {
+            background: rgba(34, 197, 94, 0.12);
+            color: #16a34a;
+        }
+        .dark .badge-green {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+
+        /* Sidebar link active state */
+        .nav-link-active {
+            background: rgba(124, 58, 237, 0.1) !important;
+            color: #7c3aed !important;
+            border-left: 3px solid #7c3aed;
+        }
+        .dark .nav-link-active {
+            background: rgba(124, 58, 237, 0.15) !important;
+            color: #a78bfa !important;
+            border-left-color: #a78bfa;
+        }
+
+        /* Modal overlay */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Misc utilities */
+        .text-balance {
+            text-wrap: balance;
+        }
+
+        .hover-lift {
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+        .dark .hover-lift:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Logo animation */
+        .logo-spin {
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .logo-spin:hover {
+            transform: rotate(12deg) scale(1.05);
+        }
+
+        /* Responsive tweaks */
+        @media (max-width: 640px) {
+            .card-premium {
+                border-radius: 0.75rem;
+            }
+            .btn-premium,
+            .btn-premium-secondary,
+            .btn-premium-ghost {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-lightBg text-slate-800 dark:bg-darkBg dark:text-slate-200 transition-colors duration-500 h-screen flex overflow-hidden">
+
+    <!-- MAIN APPLICATION WRAPPER -->
+    <div id="app-wrapper" class="flex w-full h-full relative transition-opacity duration-500">
+        <!-- Mobile Sidebar Backdrop -->
+        <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-md transition-opacity"></div>
+
+        <!-- SIDEBAR NAVIGATION -->
+        <nav id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-white/90 dark:bg-darkPanel/90 backdrop-blur-xl border-r border-slate-200/80 dark:border-slate-800/80 shadow-2xl md:shadow-none transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col h-full">
+            <!-- Brand -->
+            <div class="h-16 flex items-center justify-between px-5 border-b border-slate-200/60 dark:border-slate-800/60 cursor-pointer" onclick="NexusApp.switchView('discover')">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-lg logo-spin">
+                        <i class="fa-solid fa-cloud-bolt text-lg"></i>
+                    </div>
+                    <span class="text-lg font-extrabold tracking-tight"><span class="gradient-text">Nexus</span><span class="text-slate-600 dark:text-slate-300">Cloud</span></span>
+                </div>
+                <button id="close-sidebar" class="md:hidden text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <!-- Nav Links -->
+            <div class="p-3 space-y-0.5 flex flex-col flex-1 overflow-y-auto" id="nav-links">
+                <!-- Injected by JS -->
+            </div>
+
+            <!-- Footer -->
+            <div class="p-4 border-t border-slate-200/60 dark:border-slate-800/60 mt-auto">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-medium text-slate-400">Theme</span>
+                    <button id="theme-toggle" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary dark:hover:text-primaryLight flex items-center justify-center transition border border-slate-200 dark:border-slate-700">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
+                <div id="auth-widget" class="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-3 border border-slate-200/60 dark:border-slate-700/60">
+                    <!-- Injected by JS -->
+                </div>
+                <div class="mt-3 text-center">
+                    <button onclick="NexusApp.switchView('admin-login')" class="text-[10px] font-medium text-slate-400 hover:text-red-500 transition tracking-wide"><i class="fa-solid fa-shield-halved mr-1"></i> Admin Portal</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative min-w-0">
+
+            <!-- TOPBAR -->
+            <header class="h-16 bg-white/90 dark:bg-darkPanel/90 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-4 sm:px-6 shadow-sm z-10 shrink-0">
+                <div class="flex items-center gap-4">
+                    <button id="mobile-menu-btn" class="md:hidden text-slate-500 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <h2 class="font-bold text-lg tracking-tight text-slate-800 dark:text-slate-100" id="topbar-title">
+                        <span class="gradient-text">Discovery</span>
+                    </h2>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="btn-top-auth" class="btn-premium text-sm px-5 py-2 shadow-lg">Login / Sign Up</button>
+                </div>
+            </header>
+
+            <!-- VIEWS CONTAINER -->
+            <div id="views-container" class="flex-1 overflow-y-auto relative bg-lightBg dark:bg-darkBg p-4 sm:p-6 lg:p-8">
+
+                <!-- AUTH VIEW -->
+                <div id="view-auth" class="view-panel fade-in hidden flex items-center justify-center min-h-[75vh]">
+                    <div class="card-premium w-full max-w-md p-6 sm:p-8 scale-in">
+                        <div class="text-center mb-6">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto text-white text-2xl shadow-xl mb-4">
+                                <i class="fa-solid fa-lock"></i>
+                            </div>
+                            <h2 class="text-2xl font-extrabold" id="auth-title">Account Access</h2>
+                            <p class="text-sm text-slate-400 mt-1">Secure your workspace</p>
+                        </div>
+                        <form id="auth-form" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Username</label>
+                                <input type="text" id="auth-username" required class="input-premium" placeholder="Enter your username" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Password</label>
+                                <input type="password" id="auth-password" required class="input-premium" placeholder="••••••••" />
+                            </div>
+                            <button type="submit" class="btn-premium w-full py-2.5 text-base" id="auth-submit-btn">Login</button>
+                        </form>
+                        <p class="text-center text-sm text-slate-500 mt-5">
+                            <span id="auth-toggle-text">New user?</span>
+                            <button id="btn-toggle-auth" class="text-primary dark:text-primaryLight font-semibold hover:underline ml-1">Create an account</button>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ADMIN LOGIN VIEW -->
+                <div id="view-admin-login" class="view-panel fade-in hidden flex items-center justify-center min-h-[75vh]">
+                    <div class="card-premium w-full max-w-md p-6 sm:p-8 scale-in border-t-4 border-red-500">
+                        <div class="text-center mb-6">
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center mx-auto text-white text-2xl shadow-xl mb-4">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <h2 class="text-2xl font-extrabold text-red-600 dark:text-red-400">Admin Gateway</h2>
+                            <p class="text-sm text-slate-400 mt-1">Authorized personnel only</p>
+                        </div>
+                        <form id="admin-auth-form" class="space-y-4">
+                            <input type="text" id="admin-username" placeholder="Admin ID" required class="input-premium border-red-200 dark:border-red-800/50 focus:border-red-500 focus:shadow-red-500/10" />
+                            <input type="password" id="admin-password" placeholder="Passcode" required class="input-premium border-red-200 dark:border-red-800/50 focus:border-red-500 focus:shadow-red-500/10" />
+                            <button type="submit" class="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-2.5 rounded-xl font-bold hover:from-red-700 hover:to-red-800 transition shadow-lg hover:shadow-red-500/30">Authorize</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- DISCOVERY VIEW -->
+                <div id="view-discover" class="view-panel fade-in hidden">
+                    <div class="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                        <div>
+                            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Ecosystem</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1 text-balance">Discover and preview live web &amp; Python apps seamlessly.</p>
+                        </div>
+                        <span class="text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700">
+                            <i class="fa-regular fa-circle-dot text-primary mr-1"></i> <span id="ecosystem-count">0</span> apps live
+                        </span>
+                    </div>
+                    <div id="marketplace-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 auto-rows-fr">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <!-- DASHBOARD VIEW -->
+                <div id="view-dashboard" class="view-panel fade-in hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                        <div>
+                            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">Workspace</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1">Manage your published applications</p>
+                        </div>
+                        <button onclick="NexusApp.switchView('editor')" class="btn-premium w-full sm:w-auto flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> New Project
+                        </button>
+                    </div>
+                    <div class="card-premium overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="table-premium w-full text-left">
+                                <thead>
+                                    <tr>
+                                        <th>App Name</th>
+                                        <th>Environment</th>
+                                        <th>Link</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-projects-table" class="text-sm">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STUDIO IDE VIEW -->
+                <div id="view-editor" class="view-panel h-[calc(100vh-8rem)] flex flex-col hidden rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl">
+                    <!-- Toolbar -->
+                    <div class="h-14 bg-white/90 dark:bg-darkPanel/90 backdrop-blur-sm border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-4 shrink-0">
+                        <input type="text" id="project-name" placeholder="Name your app..." class="bg-transparent text-lg font-bold border-none outline-none w-1/2 text-primary dark:text-primaryLight placeholder:text-slate-400 focus:ring-0" />
+                        <div class="flex items-center gap-2">
+                            <button id="btn-toggle-mode" class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700">
+                                <i class="fa-solid fa-arrow-right-arrow-left mr-1.5"></i> Toggle Env
+                            </button>
+                            <button id="btn-publish-cloud" class="btn-premium text-sm px-4 py-1.5 flex items-center gap-1.5">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Publish
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Editor + Preview -->
+                    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+                        <!-- Editor -->
+                        <div class="flex-1 flex flex-col h-1/2 lg:h-full relative border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-slate-800/60 min-h-[280px]">
+                            <div class="bg-slate-50 dark:bg-[#181a1f] px-4 py-2 border-b border-slate-200/60 dark:border-slate-800/60 flex justify-between items-center text-[10px] font-mono text-slate-500">
+                                <span id="editor-env-badge" class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-primary"></span> HTML/JS Mode
+                                </span>
+                                <button id="btn-run-code" class="bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1 rounded-md shadow-sm border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-play text-green-500"></i> Run
+                                </button>
+                            </div>
+                            <div class="flex-1 relative w-full"><div id="ace-editor"></div></div>
+                        </div>
+                        <!-- Preview -->
+                        <div class="w-full lg:w-1/2 bg-white dark:bg-slate-900 flex flex-col h-1/2 lg:h-full min-h-[280px]">
+                            <div class="bg-slate-50 dark:bg-[#181a1f] border-b border-slate-200/60 dark:border-slate-800/60 px-4 py-2 text-[10px] font-mono text-slate-500 flex items-center shrink-0">
+                                <i class="fa-solid fa-desktop mr-2 text-slate-400"></i> Live Preview
+                            </div>
+                            <div class="flex-1 relative bg-white dark:bg-[#0b1120] overflow-hidden flex flex-col">
+                                <iframe id="ide-preview-frame" sandbox="allow-scripts allow-modals allow-forms" class="w-full flex-1 border-none bg-white"></iframe>
+                                <div id="ide-terminal-output" class="flex-1 p-4 overflow-y-auto text-sm terminal hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN CENTER -->
+                <div id="view-admin" class="view-panel fade-in hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                        <div>
+                            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-red-600 dark:text-red-400 flex items-center gap-3">
+                                <i class="fa-solid fa-shield-halved"></i> Admin Center
+                            </h1>
+                            <p class="text-sm text-slate-500 mt-1">Full control over the Nexus ecosystem</p>
+                        </div>
+                        <button onclick="NexusApp.logout()" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-5 py-2.5 rounded-xl font-medium hover:bg-red-100 dark:hover:bg-red-900/30 transition border border-red-200 dark:border-red-800/50">
+                            <i class="fa-solid fa-right-from-bracket mr-2"></i> Exit Admin
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <div class="card-premium p-5">
+                            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-users text-primary"></i> Users Database
+                            </h3>
+                            <div class="overflow-y-auto max-h-64 rounded-lg border border-slate-200/60 dark:border-slate-800/60">
+                                <table class="w-full text-left text-sm">
+                                    <tbody id="admin-users-table" class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        <!-- Injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-premium p-5">
+                            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-cubes text-secondary"></i> Ecosystem Apps
+                            </h3>
+                            <div class="overflow-y-auto max-h-64 rounded-lg border border-slate-200/60 dark:border-slate-800/60">
+                                <table class="w-full text-left text-sm">
+                                    <tbody id="admin-projects-table" class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        <!-- Injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-clear-data" class="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-3 rounded-xl font-bold hover:from-red-700 hover:to-red-800 transition shadow-lg hover:shadow-red-500/30 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Factory Reset Database
+                    </button>
+                </div>
+
+            </div> <!-- END VIEWS CONTAINER -->
+        </main>
+    </div> <!-- END APP WRAPPER -->
+
+    <!-- FULLSCREEN BLOG / APP VIEWER -->
+    <div id="blog-wrapper" class="hidden fixed inset-0 z-[100] bg-lightBg dark:bg-darkBg text-slate-900 dark:text-slate-100 flex flex-col h-screen overflow-hidden transition-opacity duration-500">
+        <!-- Blog Header -->
+        <header class="h-16 bg-white/90 dark:bg-darkPanel/90 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between px-4 sm:px-6 shadow-sm shrink-0">
+            <div class="flex items-center cursor-pointer" onclick="NexusApp.closeBlogPage()">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-md mr-3">
+                    <i class="fa-solid fa-cloud-bolt text-sm"></i>
+                </div>
+                <span class="text-lg font-extrabold tracking-tight hidden sm:block"><span class="gradient-text">Nexus</span><span class="text-slate-600 dark:text-slate-300">Blog</span></span>
+            </div>
+            <button onclick="NexusApp.closeBlogPage()" class="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl text-sm font-medium transition border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-left"></i> Back
+            </button>
+        </header>
+        <!-- Blog Content -->
+        <div class="flex-1 w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
+            <div class="max-w-6xl mx-auto w-full flex flex-col h-full">
+                <!-- Metadata -->
+                <div class="shrink-0 mb-6 slide-up">
+                    <h1 id="blog-title" class="text-3xl md:text-5xl font-black mb-4 tracking-tight text-slate-900 dark:text-white">App Title</h1>
+                    <div class="flex flex-wrap items-center gap-4 mb-6 border-b border-slate-200/60 dark:border-slate-800/60 pb-6">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-lg" id="blog-author">@author</p>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="badge badge-primary" id="blog-env">HTML Runtime</span>
+                                <span class="text-xs text-slate-400 font-mono">· live app</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="blog-desc" class="text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300 max-w-4xl"></p>
+                </div>
+                <!-- Execution Container -->
+                <div id="blog-execution-container" class="bg-white dark:bg-black rounded-2xl shadow-2xl border border-slate-200/60 dark:border-slate-800/60 flex flex-col flex-1 min-h-[55vh] transition-all duration-300 relative overflow-hidden">
+                    <div class="bg-slate-50 dark:bg-slate-900 px-4 py-2.5 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center shrink-0">
+                        <div class="flex gap-1.5 mr-4">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
+                            <i class="fa-solid fa-lock text-green-500"></i> Live Application Container
+                        </span>
+                        <button onclick="NexusApp.toggleFullscreen()" id="btn-fullscreen" class="ml-auto bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 border border-slate-200 dark:border-slate-700">
+                            <i class="fa-solid fa-expand"></i> <span class="hidden sm:inline">Fullscreen</span>
+                        </button>
+                    </div>
+                    <iframe id="blog-preview-frame" sandbox="allow-scripts allow-modals allow-forms" class="w-full flex-1 border-none bg-white hidden"></iframe>
+                    <div id="blog-terminal-container" class="flex-1 flex flex-col hidden bg-[#0b1120] h-full">
+                        <div id="blog-terminal-output" class="flex-1 p-6 overflow-y-auto text-sm sm:text-base terminal"></div>
+                    </div>
+                </div>
+                <div class="h-6 shrink-0"></div>
+            </div>
+        </div>
+    </div> <!-- END BLOG WRAPPER -->
+
+    <!-- PUBLISH MODAL -->
+    <div id="publish-modal" class="fixed inset-0 modal-backdrop hidden z-[150] flex items-center justify-center p-4">
+        <div class="card-premium w-full max-w-md p-6 sm:p-8 scale-in">
+            <div class="text-center mb-5">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto text-white text-xl shadow-lg mb-3">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold">Publish Application</h2>
+                <p class="text-sm text-slate-400 mt-1">Make your app live in the ecosystem</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">Brief Description</label>
+                <textarea id="publish-desc" rows="3" class="input-premium" placeholder="Describe the functionality..."></textarea>
+            </div>
+            <button id="btn-confirm-publish" class="btn-premium w-full py-2.5 text-base">Deploy Live Link</button>
+            <button onclick="document.getElementById('publish-modal').classList.add('hidden')" class="w-full bg-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-2.5 rounded-xl font-medium hover:bg-slate-100 dark:hover:bg-slate-800/50 mt-2 transition">Cancel</button>
+        </div>
+    </div>
+
+    <!-- SUCCESS URL MODAL -->
+    <div id="url-modal" class="fixed inset-0 modal-backdrop hidden z-[150] flex items-center justify-center p-4">
+        <div class="card-premium w-full max-w-lg p-6 sm:p-8 scale-in border-t-4 border-green-500">
+            <div class="text-center">
+                <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center mx-auto mb-5 text-3xl shadow-inner">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <h2 class="text-3xl font-black mb-1 text-slate-900 dark:text-white">Successfully Deployed!</h2>
+                <p class="text-slate-500 dark:text-slate-400 mb-5">Your app has a permanent link and generated blog page.</p>
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl flex items-center justify-between mb-5 border border-slate-200/60 dark:border-slate-700/60">
+                    <input type="text" readonly id="generated-url-text" class="bg-transparent font-mono text-primary dark:text-primaryLight text-sm w-full outline-none pr-2 truncate" />
+                    <button id="btn-copy-url" class="text-slate-400 hover:text-primary dark:hover:text-primaryLight transition p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <i class="fa-solid fa-copy text-lg"></i>
+                    </button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="btn-view-blog-modal" class="btn-premium flex-1 py-2.5">View Live App</button>
+                    <button onclick="document.getElementById('url-modal').classList.add('hidden'); NexusApp.switchView('dashboard')" class="flex-1 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 py-2.5 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition">Go to Dashboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CORE APPLICATION LOGIC -->
+    <script>
+        const NexusApp = (function() {
+            // LocalStorage Database
+            const DB_KEY = 'NexusDB_Pro_v2';
+            const State = {
+                users: [],
+                projects: [],
+                currentUser: null,
+                theme: 'dark',
+                editorMode: 'HTML',
+
+                load() {
+                    const data = JSON.parse(localStorage.getItem(DB_KEY));
+                    if (data) {
+                        this.users = data.users || [];
+                        this.projects = data.projects || [];
+                        this.currentUser = data.currentUser || null;
+                        this.theme = data.theme || 'dark';
+                    } else {
+                        this.users.push({ username: 'admin', password: 'superadmin', role: 'SuperAdmin' });
+                        this.save();
+                    }
+                },
+                save() {
+                    localStorage.setItem(DB_KEY, JSON.stringify({
+                        users: this.users,
+                        projects: this.projects,
+                        currentUser: this.currentUser,
+                        theme: this.theme
+                    }));
+                }
+            };
+
+            const CodeTemplates = {
+                HTML: `<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); padding: 2rem; }\n    .card { background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); border-radius: 1.5rem; padding: 3rem; box-shadow: 0 20px 60px rgba(0,0,0,0.08); text-align: center; max-width: 480px; width: 100%; border: 1px solid rgba(255,255,255,0.4); }\n    h1 { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #7c3aed, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; }\n    p { color: #64748b; margin-bottom: 2rem; line-height: 1.6; }\n    button { padding: 0.75rem 2rem; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border: none; border-radius: 0.75rem; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.25s cubic-bezier(0.16,1,0.3,1); box-shadow: 0 4px 16px rgba(124,58,237,0.25); }\n    button:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(124,58,237,0.35); }\n    button:active { transform: scale(0.97); }\n    .badge { display: inline-block; padding: 0.25rem 0.75rem; background: rgba(124,58,237,0.1); color: #7c3aed; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; margin-top: 1.5rem; }\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1>✦ Nexus Sandbox</h1>\n    <p>This is a fully interactive HTML application running inside a secure iframe sandbox. All scripts and styles are isolated.</p>\n    <button onclick="document.querySelector('p').innerHTML = '🚀 JavaScript executed successfully! The sandbox is fully operational.'">Run Interaction Test</button>\n    <div class="badge">⚡ Live HTML Runtime</div>\n  </div>\n</body>\n</html>`,
+                PYTHON: `def run():\n    print("=" * 42)\n    print("  🐍 NATIVE PYTHON EXECUTION ENGINE")\n    print("  WebAssembly · Pyodide Runtime")\n    print("=" * 42)\n    \n    # Generate simulated data\n    data = [x ** 2 for x in range(12)]\n    print(f"\\n📊 Generated dataset: {data}")\n    print(f"📈 Sum of squares: {sum(data)}")\n    print(f"📉 Average value: {sum(data) / len(data):.2f}")\n    \n    # Simple algorithm demonstration\n    primes = [n for n in range(2, 50) if all(n % d != 0 for d in range(2, int(n**0.5) + 1))]\n    print(f"🔢 Primes up to 50: {primes}")\n    \n    print("\\n" + "=" * 42)\n    print("✅ Execution complete. Ready for input.")\n    print("=" * 42)\n\nif __name__ == '__main__':\n    run()`
+            };
+
+            let editor = null;
+            let isLoginMode = true;
+            let currentAppId = null;
+            let isFullscreen = false;
+
+            // Execution Engine
+            const Runner = {
+                async execute(code, mode, frameId, terminalId) {
+                    const iframe = document.getElementById(frameId);
+                    const terminal = document.getElementById(terminalId);
+                    const termContainer = terminal.parentElement;
+
+                    if (mode === 'HTML') {
+                        terminal.classList.add('hidden');
+                        if (termContainer && termContainer.id.includes('container')) termContainer.classList.add('hidden');
+                        iframe.classList.remove('hidden');
+                        iframe.srcdoc = code;
+                    } else if (mode === 'PYTHON') {
+                        iframe.classList.add('hidden');
+                        if (termContainer && termContainer.id.includes('container')) termContainer.classList.remove('hidden');
+                        terminal.classList.remove('hidden');
+                        terminal.innerHTML =
+                        `<div class="text-slate-400">⏳ Initializing WebAssembly Python Kernel...</div>`;
+
+                        try {
+                            if (!window.pyodide) {
+                                window.pyodide = await loadPyodide({
+                                    stdout: (text) => terminal.innerHTML +=
+                                        `<div class="text-slate-200">${text}</div>`,
+                                    stderr: (text) => terminal.innerHTML +=
+                                        `<div class="text-red-400">${text}</div>`
+                                });
+                            }
+                            terminal.innerHTML =
+                            `<div class="text-green-400">✅ Runtime active. Executing script...</div><br>`;
+                            await window.pyodide.runPythonAsync(code);
+                            terminal.innerHTML +=
+                            `<br><div class="text-green-400">✅ System Process Finished.</div>`;
+                        } catch (err) {
+                            terminal.innerHTML +=
+                            `<br><div class="text-red-500">❌ Error: ${err.toString().replace(/</g, "&lt;")}</div>`;
+                        }
+                        terminal.scrollTop = terminal.scrollHeight;
+                    }
+                }
+            };
+
+            const UI = {
+                init() {
+                    if (State.theme === 'dark') document.documentElement.classList.add('dark');
+
+                    editor = ace.edit("ace-editor");
+                    editor.setTheme(State.theme === 'dark' ? "ace/theme/tomorrow_night_eighties" : "ace/theme/chrome");
+                    editor.session.setMode("ace/mode/html");
+                    editor.setValue(CodeTemplates.HTML, -1);
+
+                    this.bindEvents();
+                    this.updateNav();
+                    this.handleRouting();
+
+                    window.addEventListener('popstate', () => {
+                        this.handleRouting(false);
+                    });
+                },
+
+                handleRouting(pushState = true) {
+                    const params = new URLSearchParams(window.location.search);
+                    const appId = params.get('app');
+                    if (appId) {
+                        this.viewAppPanel(appId, pushState);
+                    } else {
+                        document.getElementById('blog-wrapper').classList.add('hidden');
+                        document.getElementById('app-wrapper').classList.remove('hidden');
+                        this.switchView(State.currentUser ? 'discover' : 'discover', false);
+                    }
+                },
+
+                bindEvents() {
+                    // Sidebar
+                    const toggleSidebar = () => {
+                        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+                        document.getElementById('mobile-overlay').classList.toggle('hidden');
+                    };
+                    document.getElementById('mobile-menu-btn').addEventListener('click', toggleSidebar);
+                    document.getElementById('close-sidebar').addEventListener('click', toggleSidebar);
+                    document.getElementById('mobile-overlay').addEventListener('click', toggleSidebar);
+
+                    // Theme
+                    document.getElementById('theme-toggle').addEventListener('click', () => {
+                        document.documentElement.classList.toggle('dark');
+                        State.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                        if (editor) editor.setTheme(State.theme === 'dark' ? "ace/theme/tomorrow_night_eighties" :
+                            "ace/theme/chrome");
+                        State.save();
+                        // Update icon
+                        const icon = document.getElementById('theme-toggle').querySelector('i');
+                        if (State.theme === 'dark') {
+                            icon.className = 'fa-solid fa-sun';
+                        } else {
+                            icon.className = 'fa-solid fa-moon';
+                        }
+                    });
+                    // Set initial icon
+                    const themeIcon = document.getElementById('theme-toggle').querySelector('i');
+                    if (State.theme === 'dark') {
+                        themeIcon.className = 'fa-solid fa-sun';
+                    } else {
+                        themeIcon.className = 'fa-solid fa-moon';
+                    }
+
+                    // Auth
+                    document.getElementById('btn-top-auth').addEventListener('click', () => this.switchView('auth'));
+                    document.getElementById('btn-toggle-auth').addEventListener('click', () => {
+                        isLoginMode = !isLoginMode;
+                        document.getElementById('auth-title').innerText = isLoginMode ? "Account Access" :
+                            "Create Account";
+                        document.getElementById('auth-submit-btn').innerText = isLoginMode ? "Login" : "Sign Up";
+                        document.getElementById('auth-toggle-text').innerText = isLoginMode ? "New user?" :
+                            "Already registered?";
+                        document.getElementById('btn-toggle-auth').innerText = isLoginMode ? "Create an account" :
+                            "Login";
+                    });
+
+                    document.getElementById('auth-form').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const u = document.getElementById('auth-username').value.trim();
+                        const p = document.getElementById('auth-password').value.trim();
+                        if (isLoginMode) Auth.login(u, p);
+                        else Auth.signup(u, p);
+                    });
+
+                    document.getElementById('admin-auth-form').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        Auth.adminLogin(document.getElementById('admin-username').value, document.getElementById(
+                            'admin-password').value);
+                    });
+
+                    // IDE
+                    document.getElementById('btn-toggle-mode').addEventListener('click', () => {
+                        State.editorMode = State.editorMode === 'HTML' ? 'PYTHON' : 'HTML';
+                        editor.session.setMode(State.editorMode === 'HTML' ? "ace/mode/html" : "ace/mode/python");
+                        editor.setValue(CodeTemplates[State.editorMode], -1);
+                        document.getElementById('editor-env-badge').innerHTML =
+                            `<span class="w-2 h-2 rounded-full ${State.editorMode === 'HTML' ? 'bg-primary' : 'bg-secondary'}"></span> ${State.editorMode === 'HTML' ? 'HTML/JS Mode' : 'Python Mode'}`;
+                    });
+
+                    document.getElementById('btn-run-code').addEventListener('click', () => {
+                        Runner.execute(editor.getValue(), State.editorMode, 'ide-preview-frame',
+                        'ide-terminal-output');
+                    });
+
+                    // Publish
+                    document.getElementById('btn-publish-cloud').addEventListener('click', () => {
+                        if (!document.getElementById('project-name').value.trim()) return alert(
+                            "Please provide an app name.");
+                        document.getElementById('publish-modal').classList.remove('hidden');
+                    });
+
+                    document.getElementById('btn-confirm-publish').addEventListener('click', () => {
+                        const name = document.getElementById('project-name').value.trim();
+                        const desc = document.getElementById('publish-desc').value.trim() ||
+                            "No description provided.";
+                        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+                        if (State.projects.some(p => p.id === id)) return alert(
+                            "An application with this generated link already exists.");
+
+                        State.projects.push({ id, name, author: State.currentUser.username, env: State
+                                .editorMode, code: editor.getValue(), desc });
+                        State.save();
+
+                        document.getElementById('publish-modal').classList.add('hidden');
+
+                        const baseUrl = window.location.href.split('?')[0];
+                        const fullUrl = `${baseUrl}?app=${encodeURIComponent(id)}`;
+
+                        document.getElementById('generated-url-text').value = fullUrl;
+                        currentAppId = id;
+                        document.getElementById('url-modal').classList.remove('hidden');
+                        this.renderDashboard();
+                        this.renderDiscover();
+                    });
+
+                    document.getElementById('btn-copy-url').addEventListener('click', () => {
+                        const copyText = document.getElementById("generated-url-text");
+                        copyText.select();
+                        document.execCommand("copy");
+                        alert("Secure Link Copied to clipboard!");
+                    });
+
+                    document.getElementById('btn-view-blog-modal').addEventListener('click', () => {
+                        document.getElementById('url-modal').classList.add('hidden');
+                        if (currentAppId) this.viewAppPanel(currentAppId, true);
+                    });
+
+                    document.getElementById('btn-clear-data').addEventListener('click', () => {
+                        if (confirm(
+                                "CRITICAL WARNING: This will completely wipe all registered users, apps, and local configurations. Proceed?"
+                                )) {
+                            localStorage.removeItem(DB_KEY);
+                            location.href = window.location.pathname;
+                        }
+                    });
+                },
+
+                updateNav() {
+                    const nav = document.getElementById('nav-links');
+                    const authW = document.getElementById('auth-widget');
+                    const topBtn = document.getElementById('btn-top-auth');
+
+                    let links =
+                        `<button onclick="NexusApp.switchView('discover')" class="w-full flex items-center gap-3 p-3 text-slate-600 dark:text-slate-300 hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-all font-medium text-sm"><i class="fa-solid fa-compass w-5 text-primary dark:text-primaryLight"></i> Discovery</button>`;
+
+                    if (!State.currentUser) {
+                        authW.innerHTML =
+                            `<p class="text-xs text-center text-slate-400 font-medium">Not authenticated</p>`;
+                        topBtn.classList.remove('hidden');
+                    } else {
+                        topBtn.classList.add('hidden');
+                        const u = State.currentUser;
+                        const initial = u.username.charAt(0).toUpperCase();
+
+                        authW.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold shadow-md text-sm">${initial}</div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold truncate text-slate-800 dark:text-slate-100">${u.username}</p>
+                                    <p class="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full ${u.role === 'SuperAdmin' ? 'bg-red-400' : 'bg-green-400'}"></span> ${u.role}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onclick="NexusApp.logout()" class="w-full mt-2.5 text-[10px] font-medium text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:underline transition">Secure Logout</button>
+                        `;
+
+                        if (u.role === 'Publisher' || u.role === 'SuperAdmin') {
+                            links += `
+                                <button onclick="NexusApp.switchView('dashboard')" class="w-full flex items-center gap-3 p-3 text-slate-600 dark:text-slate-300 hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-all font-medium text-sm"><i class="fa-solid fa-layer-group w-5 text-primary dark:text-primaryLight"></i> Workspace</button>
+                                <button onclick="NexusApp.switchView('editor')" class="w-full flex items-center gap-3 p-3 text-slate-600 dark:text-slate-300 hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-all font-medium text-sm"><i class="fa-solid fa-code w-5 text-primary dark:text-primaryLight"></i> Studio IDE</button>
+                            `;
+                        } else {
+                            links += `
+                                <button onclick="NexusApp.upgradeRole()" class="w-full mt-3 bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-primary/20 dark:to-secondary/20 text-primary dark:text-primaryLight p-3 rounded-xl flex items-center gap-3 hover:shadow-lg transition-all font-medium text-sm border border-primary/10 dark:border-primary/20">
+                                    <i class="fa-solid fa-rocket w-5"></i> Upgrade to Publisher
+                                </button>
+                            `;
+                        }
+                    }
+                    nav.innerHTML = links;
+                },
+
+                switchView(viewId, pushState = true) {
+                    // Auth guards
+                    if (['dashboard', 'editor'].includes(viewId)) {
+                        if (!State.currentUser || (State.currentUser.role !== 'Publisher' && State.currentUser
+                                .role !== 'SuperAdmin')) {
+                            alert("Publisher authorization required.");
+                            return;
+                        }
+                    }
+                    if (viewId === 'admin' && (!State.currentUser || State.currentUser.role !== 'SuperAdmin')) return;
+
+                    if (pushState) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('app');
+                        window.history.pushState({}, '', url);
+                    }
+
+                    document.getElementById('app-wrapper').classList.remove('hidden');
+                    document.getElementById('blog-wrapper').classList.add('hidden');
+
+                    document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
+                    const panel = document.getElementById(`view-${viewId}`);
+                    if (panel) panel.classList.remove('hidden');
+
+                    const titles = {
+                        discover: 'Discovery',
+                        auth: 'Authentication',
+                        dashboard: 'Workspace',
+                        editor: 'Studio IDE',
+                        admin: 'Admin Center',
+                        'admin-login': 'Admin Gateway'
+                    };
+                    const titleEl = document.getElementById('topbar-title');
+                    if (titles[viewId]) {
+                        titleEl.innerHTML = `<span class="gradient-text">${titles[viewId]}</span>`;
+                    } else {
+                        titleEl.textContent = '';
+                    }
+
+                    if (viewId === 'discover') this.renderDiscover();
+                    if (viewId === 'dashboard') this.renderDashboard();
+                    if (viewId === 'editor') { if (editor) editor.resize(); }
+                    if (viewId === 'admin') this.renderAdmin();
+
+                    document.getElementById('sidebar').classList.add('-translate-x-full');
+                    document.getElementById('mobile-overlay').classList.add('hidden');
+                },
+
+                renderDiscover() {
+                    const grid = document.getElementById('marketplace-grid');
+                    const count = document.getElementById('ecosystem-count');
+                    count.textContent = State.projects.length;
+
+                    if (State.projects.length === 0) {
+                        grid.innerHTML = `
+                            <div class="col-span-full flex flex-col items-center justify-center py-12 text-slate-400">
+                                <div class="w-20 h-20 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-3xl mb-4 border border-slate-200 dark:border-slate-700">
+                                    <i class="fa-regular fa-cubes"></i>
+                                </div>
+                                <p class="font-medium">No applications found in ecosystem.</p>
+                                <p class="text-sm">Be the first to publish!</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    grid.innerHTML = State.projects.map(p => `
+                        <div class="card-premium p-5 flex flex-col justify-between hover-lift group">
+                            <div>
+                                <div class="flex justify-between items-start mb-3">
+                                    <h3 class="font-bold text-lg text-slate-900 dark:text-white truncate pr-2">${p.name}</h3>
+                                    <span class="badge ${p.env === 'HTML' ? 'badge-primary' : 'badge-secondary'} shrink-0">${p.env}</span>
+                                </div>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">${p.desc}</p>
+                            </div>
+                            <div class="mt-auto">
+                                <button onclick="NexusApp.viewAppPanel('${p.id}')" class="w-full btn-premium-ghost py-2 text-sm flex items-center justify-center gap-2">
+                                    Launch Application <i class="fa-solid fa-arrow-right text-xs"></i>
+                                </button>
+                                <div class="mt-3 text-[10px] text-slate-400 text-center flex items-center justify-center gap-2">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> Authored by @${p.author}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                },
+
+                renderDashboard() {
+                    const myProjects = State.projects.filter(p => p.author === State.currentUser.username);
+                    const tbody = document.getElementById('user-projects-table');
+                    if (myProjects.length === 0) {
+                        tbody.innerHTML =
+                            `<tr><td colspan="4" class="p-6 text-center text-slate-400 text-sm">No projects authored yet. Start building!</td></tr>`;
+                        return;
+                    }
+                    tbody.innerHTML = myProjects.map(p => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                            <td class="p-4 font-semibold">${p.name}</td>
+                            <td class="p-4"><span class="badge ${p.env === 'HTML' ? 'badge-primary' : 'badge-secondary'}">${p.env}</span></td>
+                            <td class="p-4">
+                                <button onclick="NexusApp.viewAppPanel('${p.id}')" class="text-primary dark:text-primaryLight hover:underline text-sm font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-external-link-alt text-xs"></i> View Blog
+                                </button>
+                            </td>
+                            <td class="p-4">
+                                <button onclick="NexusApp.deleteProject('${p.id}')" class="text-slate-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                },
+
+                renderAdmin() {
+                    document.getElementById('admin-users-table').innerHTML = State.users.map(u => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                            <td class="p-3 font-medium">${u.username}</td>
+                            <td class="p-3">
+                                <span class="badge ${u.role === 'SuperAdmin' ? 'badge-red' : 'badge-green'}">${u.role}</span>
+                            </td>
+                            <td class="p-3">
+                                ${u.role !== 'SuperAdmin' ? `<button onclick="NexusApp.deleteUser('${u.username}')" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 px-2.5 py-1 rounded-lg text-xs font-medium transition">Delete</button>` : '<span class="text-xs text-slate-400">Protected</span>'}
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    document.getElementById('admin-projects-table').innerHTML = State.projects.map(p => `
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                            <td class="p-3 font-medium">${p.name}</td>
+                            <td class="p-3 text-xs text-slate-500">@${p.author}</td>
+                            <td class="p-3">
+                                <button onclick="NexusApp.deleteProject('${p.id}')" class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 px-2.5 py-1 rounded-lg text-xs font-medium transition">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                },
+
+                viewAppPanel(appId, pushState = true) {
+                    const project = State.projects.find(p => p.id === appId);
+                    if (!project) {
+                        alert("Error 404: Application not found.");
+                        this.switchView('discover', pushState);
+                        return;
+                    }
+
+                    if (pushState) {
+                        const baseUrl = window.location.href.split('?')[0];
+                        window.history.pushState({ app: appId }, project.name,
+                            `${baseUrl}?app=${encodeURIComponent(appId)}`);
+                    }
+
+                    isFullscreen = false;
+                    const container = document.getElementById('blog-execution-container');
+                    container.classList.remove('fullscreen-active');
+                    document.getElementById('btn-fullscreen').innerHTML =
+                        `<i class="fa-solid fa-expand"></i> <span class="hidden sm:inline">Fullscreen</span>`;
+
+                    document.getElementById('app-wrapper').classList.add('hidden');
+                    document.getElementById('blog-wrapper').classList.remove('hidden');
+
+                    document.title = `${project.name} · Nexus Ecosystem`;
+                    document.getElementById('blog-title').innerText = project.name;
+                    document.getElementById('blog-author').innerText = `@${project.author}`;
+                    document.getElementById('blog-env').innerText = `${project.env} Kernel`;
+                    document.getElementById('blog-desc').innerText = project.desc;
+
+                    Runner.execute(project.code, project.env, 'blog-preview-frame', 'blog-terminal-output');
+                },
+
+                closeBlogPage(pushState = true) {
+                    if (pushState) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('app');
+                        window.history.pushState({}, '', url);
+                    }
+                    document.title = "Nexus Cloud Pro — Secure IDE & Publishing";
+                    document.getElementById('blog-wrapper').classList.add('hidden');
+                    document.getElementById('app-wrapper').classList.remove('hidden');
+
+                    if (document.querySelector('.view-panel:not(.hidden)') === null) {
+                        this.switchView('discover', false);
+                    }
+                },
+
+                toggleFullscreen() {
+                    const container = document.getElementById('blog-execution-container');
+                    const btn = document.getElementById('btn-fullscreen');
+                    isFullscreen = !isFullscreen;
+
+                    if (isFullscreen) {
+                        container.classList.add('fullscreen-active');
+                        btn.innerHTML = `<i class="fa-solid fa-compress"></i> <span class="hidden sm:inline">Exit Fullscreen</span>`;
+                    } else {
+                        container.classList.remove('fullscreen-active');
+                        btn.innerHTML = `<i class="fa-solid fa-expand"></i> <span class="hidden sm:inline">Fullscreen</span>`;
+                    }
+                }
+            };
+
+            const Auth = {
+                login(username, password) {
+                    const user = State.users.find(u => u.username === username && u.password === password);
+                    if (!user) return alert("Authentication failed. Invalid credentials.");
+                    if (user.role === 'SuperAdmin') return alert(
+                        "SuperAdmins must use the secure Admin Gateway.");
+                    State.currentUser = user;
+                    State.save();
+                    UI.updateNav();
+                    UI.switchView('discover');
+                },
+                signup(username, password) {
+                    if (State.users.some(u => u.username === username)) return alert(
+                        "Username already registered.");
+                    State.currentUser = { username, password, role: 'Viewer' };
+                    State.users.push(State.currentUser);
+                    State.save();
+                    UI.updateNav();
+                    UI.switchView('discover');
+                },
+                adminLogin(username, password) {
+                    const user = State.users.find(u => u.username === username && u.password === password && u
+                        .role === 'SuperAdmin');
+                    if (!user) return alert("Unauthorized access logged.");
+                    State.currentUser = user;
+                    State.save();
+                    UI.updateNav();
+                    UI.switchView('admin');
+                }
+            };
+
+            // Public API
+            return {
+                start() { State.load();
+                    UI.init(); },
+                switchView(v, pushState = true) { UI.switchView(v, pushState); },
+                viewAppPanel(id, pushState = true) { UI.viewAppPanel(id, pushState); },
+                closeBlogPage() { UI.closeBlogPage(true); },
+                toggleFullscreen() { UI.toggleFullscreen(); },
+                logout() {
+                    State.currentUser = null;
+                    State.save();
+                    UI.updateNav();
+                    UI.switchView('discover');
+                },
+                upgradeRole() {
+                    State.currentUser.role = 'Publisher';
+                    State.save();
+                    UI.updateNav();
+                    UI.switchView('dashboard');
+                    alert("Success! You have Publisher rights.");
+                },
+                deleteProject(id) {
+                    if (confirm("Permanently delete this application from the ecosystem?")) {
+                        State.projects = State.projects.filter(p => p.id !== id);
+                        State.save();
+                        UI.renderDashboard();
+                        if (State.currentUser && State.currentUser.role === 'SuperAdmin') UI.renderAdmin();
+                        UI.renderDiscover();
+                    }
+                },
+                deleteUser(username) {
+                    if (confirm(`Eradicate user @${username} and all associated projects?`)) {
+                        State.users = State.users.filter(u => u.username !== username);
+                        State.projects = State.projects.filter(p => p.author !== username);
+                        State.save();
+                        UI.renderAdmin();
+                    }
+                }
+            };
+        })();
+
+        // Bootstrap
+        window.onload = () => NexusApp.start();
+    </script>
+</body>
+  </html>
